@@ -525,6 +525,7 @@ namespace MySql.Data.Entity
     {
       BinaryFragment bf = sf as BinaryFragment;
       ColumnFragment cf = sf as ColumnFragment;
+      LikeFragment lf = sf as LikeFragment;
       if (bf != null)
       {
         VisitAndReplaceTableName(bf.Left, oldTable, newTable);
@@ -533,6 +534,10 @@ namespace MySql.Data.Entity
       else if ((cf != null) && (cf.TableName == oldTable))
       {
         cf.TableName = newTable;
+      }
+      else if ((lf != null))
+      {
+        VisitAndReplaceTableName(lf.Argument, oldTable, newTable);
       }
     }
 

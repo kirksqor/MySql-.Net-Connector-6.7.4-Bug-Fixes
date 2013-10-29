@@ -24,6 +24,7 @@ using System;
 using System.IO;
 using System.Reflection;
 using System.Data;
+using System.Text;
 using System.Xml;
 using System.Data.Common;
 using System.Data.Metadata.Edm;
@@ -300,8 +301,24 @@ namespace MySql.Data.MySqlClient
 
         public override bool SupportsEscapingLikeArgument(out char escapeCharacter)
         {
-            escapeCharacter = '~';
+            escapeCharacter = '\\';
             return true;
+        }
+
+        public override string EscapeLikeArgument(string argument)
+        {
+            if (!argument.Contains("\\") && !argument.Contains("_") && !argument.Contains("%"))
+                return argument;
+
+            var builder = new StringBuilder();
+            foreach (var c in argument)
+            {
+                if (c == '\\' || c == '_' || c == '%')
+                    builder.Append('\\');
+                builder.Append(c);
+            }
+
+            return builder.ToString();
         }
     }
 }
