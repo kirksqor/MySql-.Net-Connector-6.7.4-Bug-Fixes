@@ -109,7 +109,6 @@
       <ItemGroup>
         <Reference Include="System" />
         <Reference Include="System.Core" />
-        <Reference Include="System.Data.Entity" />
         <Reference Include="System.Data.DataSetExtensions" />
         <Reference Include="System.Data" />
         <Reference Include="System.Xml" />
@@ -213,9 +212,10 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="EntityFramework">
-      <HintPath>..\..\packages\EntityFramework.5.0.0\lib\net45\EntityFramework.dll</HintPath>
+      <HintPath>Z:\dev\SqorRest\packages\EntityFramework.5.0.0\lib\net45\EntityFramework.dll</HintPath>
     </Reference>
     <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Data.Entity" />
   </ItemGroup>
   <Choose>
     <When Condition="'$(Framework)' == '4.5'">

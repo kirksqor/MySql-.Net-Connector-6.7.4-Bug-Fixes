@@ -33,254 +33,275 @@ using System.Globalization;
 
 namespace MySql.Data.MySqlClient
 {
-  internal class MySqlProviderManifest : DbXmlEnabledProviderManifest
-  {
-    string manifestToken;
-
-    public MySqlProviderManifest(string version)
-      : base(GetManifest())
+    internal class MySqlProviderManifest : DbXmlEnabledProviderManifest
     {
-      manifestToken = version;
-    }
+        private string manifestToken;
 
-    private static XmlReader GetManifest()
-    {
-      return GetXmlResource("MySql.Data.Entity.Properties.ProviderManifest.xml");
-    }
+        public MySqlProviderManifest(string version)
+            : base(GetManifest())
+        {
+            manifestToken = version;
+        }
 
-    protected override XmlReader GetDbInformation(string informationType)
-    {
-      if (informationType == DbProviderManifest.StoreSchemaDefinition)
-      {
-        return GetStoreSchemaDescription();
-      }
+        private static XmlReader GetManifest()
+        {
+            return GetXmlResource("MySql.Data.Entity.Properties.ProviderManifest.xml");
+        }
 
-      if (informationType == DbProviderManifest.StoreSchemaMapping)
-      {
-        return GetStoreSchemaMapping();
-      }
-
-      throw new ProviderIncompatibleException(String.Format("The provider returned null for the informationType '{0}'.", informationType));
-    }
-
-    private XmlReader GetStoreSchemaMapping()
-    {
-      return GetMappingResource("SchemaMapping.msl");
-    }
-
-    private XmlReader GetStoreSchemaDescription()
-    {
-      double version = double.Parse(manifestToken, CultureInfo.InvariantCulture);
-
-      if (version < 5.0) throw new NotSupportedException("Your version of MySQL is not currently supported");
-      if (version < 5.1) return GetMappingResource("SchemaDefinition-5.0.ssdl");
-      if (version < 5.5) return GetMappingResource("SchemaDefinition-5.1.ssdl");
-      if (version < 5.6) return GetMappingResource("SchemaDefinition-5.5.ssdl");
-      return GetMappingResource("SchemaDefinition-5.6.ssdl");
-    }
-
-    public override TypeUsage GetEdmType(TypeUsage storeType)
-    {
-      if (storeType == null)
-      {
-        throw new ArgumentNullException("storeType");
-      }
-
-      string storeTypeName = storeType.EdmType.Name.ToLowerInvariant();
-
-      if (!base.StoreTypeNameToEdmPrimitiveType.ContainsKey(storeTypeName))
-      {
-        throw new ArgumentException(String.Format("The underlying provider does not support the type '{0}'.", storeTypeName));
-      }
-
-      PrimitiveType edmPrimitiveType = base.StoreTypeNameToEdmPrimitiveType[storeTypeName];
-
-      if (edmPrimitiveType.PrimitiveTypeKind == PrimitiveTypeKind.Binary)
-      {
-        return TypeUsage.CreateBinaryTypeUsage(edmPrimitiveType, false);
-      }
-
-      if (edmPrimitiveType.PrimitiveTypeKind == PrimitiveTypeKind.String)
-      {
-        Facet facet;
-        if (storeType.Facets.TryGetValue("MaxLength", false, out facet) && !facet.IsUnbounded && facet.Value != null)
-          return TypeUsage.CreateStringTypeUsage(edmPrimitiveType, false, false, (int)facet.Value);
-        else
-          return TypeUsage.CreateStringTypeUsage(edmPrimitiveType, false, false);
-      }
-
-      return TypeUsage.CreateDefaultTypeUsage(edmPrimitiveType);
-    }
-
-    private const int CHAR_MAXLEN = 255;
-    private const int VARCHAR_MAXLEN = 65535;
-    private const int MEDIUMTEXT_MAXLEN = 16777215;
-    private const int LONGTEXT_MAXLEN = 1073741823;
-
-    private const int BINARY_MAXLEN = 255;
-    private const int VARBINARY_MAXLEN = 65535;
-    private const int MEDIUMBLOB_MAXLEN = 16777215;
-    private const int LONGBLOB_MAXLEN = 2147483647;
-
-    internal const int DEFAULT_DECIMAL_PRECISION = 10;
-    internal const int DEFAULT_DECIMAL_SCALE = 2;
-
-    public override TypeUsage GetStoreType(TypeUsage edmType)
-    {
-      if (edmType == null)
-        throw new ArgumentNullException("edmType");
-
-      Debug.Assert(edmType.EdmType.BuiltInTypeKind == BuiltInTypeKind.PrimitiveType);
-
-      PrimitiveType primitiveType = edmType.EdmType as PrimitiveType;
-      if (primitiveType == null)
-        throw new ArgumentException(String.Format(Resources.TypeNotSupported, edmType));
-
-      ReadOnlyMetadataCollection<Facet> facets = edmType.Facets;
-
-      switch (primitiveType.PrimitiveTypeKind)
-      {
-        case PrimitiveTypeKind.Boolean:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["bool"]);
-
-        case PrimitiveTypeKind.Byte:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["utinyint"]);
-
-        case PrimitiveTypeKind.SByte:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["tinyint"]);
-
-        case PrimitiveTypeKind.Int16:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["smallint"]);
-
-        case PrimitiveTypeKind.Int32:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["int"]);
-
-        case PrimitiveTypeKind.Int64:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["bigint"]);
-
-        case PrimitiveTypeKind.Guid:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["guid"]);
-
-        case PrimitiveTypeKind.Double:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["double"]);
-
-        case PrimitiveTypeKind.Single:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["float"]);
-
-        case PrimitiveTypeKind.Decimal:
-          {
-            byte precision = DEFAULT_DECIMAL_PRECISION;
-            byte scale = DEFAULT_DECIMAL_SCALE;
-            Facet facet;
-
-            if (edmType.Facets.TryGetValue("Precision", false, out facet))
+        protected override XmlReader GetDbInformation(string informationType)
+        {
+            if (informationType == DbProviderManifest.StoreSchemaDefinition)
             {
-              if (!facet.IsUnbounded && facet.Value != null)
-                precision = (byte)facet.Value;
+                return GetStoreSchemaDescription();
             }
 
-            if (edmType.Facets.TryGetValue("Scale", false, out facet))
+            if (informationType == DbProviderManifest.StoreSchemaMapping)
             {
-              if (!facet.IsUnbounded && facet.Value != null )
-                scale = (byte)facet.Value;
+                return GetStoreSchemaMapping();
             }
 
-            return TypeUsage.CreateDecimalTypeUsage(StoreTypeNameToStorePrimitiveType["decimal"], precision, scale);
-          }
+            throw new ProviderIncompatibleException(
+                String.Format("The provider returned null for the informationType '{0}'.", informationType));
+        }
 
-        case PrimitiveTypeKind.Binary:
-          {
-            bool isFixedLength = null != facets["FixedLength"].Value && (bool)facets["FixedLength"].Value;
-            Facet f = facets["MaxLength"];
-            bool isMaxLength = f.IsUnbounded || null == f.Value || (int)f.Value > MEDIUMBLOB_MAXLEN;
-            int maxLength = !isMaxLength ? (int)f.Value : LONGBLOB_MAXLEN;
+        private XmlReader GetStoreSchemaMapping()
+        {
+            return GetMappingResource("SchemaMapping.msl");
+        }
 
-            string typeName = String.Empty;
+        private XmlReader GetStoreSchemaDescription()
+        {
+            double version = double.Parse(manifestToken, CultureInfo.InvariantCulture);
 
-            // now this applies for both isFixedLength and !isFixedLength
-            if (maxLength < CHAR_MAXLEN) typeName = "tinyblob";
-            else if (maxLength < MEDIUMBLOB_MAXLEN) typeName = "blob";
-            else if (maxLength < LONGTEXT_MAXLEN) typeName = "mediumblob";
-            else typeName = "longblob";
+            if (version < 5.0) throw new NotSupportedException("Your version of MySQL is not currently supported");
+            if (version < 5.1) return GetMappingResource("SchemaDefinition-5.0.ssdl");
+            if (version < 5.5) return GetMappingResource("SchemaDefinition-5.1.ssdl");
+            if (version < 5.6) return GetMappingResource("SchemaDefinition-5.5.ssdl");
+            return GetMappingResource("SchemaDefinition-5.6.ssdl");
+        }
 
-            return TypeUsage.CreateBinaryTypeUsage(StoreTypeNameToStorePrimitiveType[typeName], isFixedLength, maxLength);
-          }
-
-        case PrimitiveTypeKind.String:
-          {
-            string typeName = String.Empty;
-            bool isUnicode = null != facets["Unicode"].Value && (bool)facets["Unicode"].Value;
-            bool isFixedLength = null != facets["FixedLength"].Value && (bool)facets["FixedLength"].Value;
-            int maxLenghtValue;
-
-            Facet maxLengthFacet = facets["MaxLength"];
-            if (isFixedLength)
+        public override TypeUsage GetEdmType(TypeUsage storeType)
+        {
+            if (storeType == null)
             {
-              typeName = isUnicode ? "nchar" : "char";
-              if (maxLengthFacet.Value != null && Int32.TryParse(maxLengthFacet.Value.ToString(), out maxLenghtValue) && maxLenghtValue <= CHAR_MAXLEN)
-                return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType[typeName], isUnicode, isFixedLength, (int)maxLengthFacet.Value);
-              else if (maxLengthFacet.Value != null && maxLengthFacet.Value.ToString() == "Max")
-                return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType[typeName], isUnicode, isFixedLength, CHAR_MAXLEN);
-              else
-                return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType[typeName], isUnicode, isFixedLength);
+                throw new ArgumentNullException("storeType");
             }
-            else
-            {
-              typeName = isUnicode ? "nvarchar" : "varchar";
-              if (maxLengthFacet.Value != null && Int32.TryParse(maxLengthFacet.Value.ToString(), out maxLenghtValue))
-              {
-                if (maxLenghtValue > VARCHAR_MAXLEN && maxLenghtValue <= MEDIUMTEXT_MAXLEN) typeName = "mediumtext";
-                else if ((int)maxLengthFacet.Value > MEDIUMTEXT_MAXLEN) typeName = "longtext";
-                return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType[typeName], isUnicode, isFixedLength, (int)maxLengthFacet.Value);
-              }
-              else if (maxLengthFacet.Value != null && (maxLengthFacet.Value.ToString() == "Max"))
-                return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType["longtext"], isUnicode, isFixedLength);
-              else
-                return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType[typeName], isUnicode, isFixedLength);
-            }
-          }
 
-        case PrimitiveTypeKind.DateTimeOffset:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["timestamp"]);
-        case PrimitiveTypeKind.DateTime:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["datetime"]);
-        case PrimitiveTypeKind.Time:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["time"]);
+            string storeTypeName = storeType.EdmType.Name.ToLowerInvariant();
+
+            if (!base.StoreTypeNameToEdmPrimitiveType.ContainsKey(storeTypeName))
+            {
+                throw new ArgumentException(String.Format("The underlying provider does not support the type '{0}'.",
+                    storeTypeName));
+            }
+
+            PrimitiveType edmPrimitiveType = base.StoreTypeNameToEdmPrimitiveType[storeTypeName];
+
+            if (edmPrimitiveType.PrimitiveTypeKind == PrimitiveTypeKind.Binary)
+            {
+                return TypeUsage.CreateBinaryTypeUsage(edmPrimitiveType, false);
+            }
+
+            if (edmPrimitiveType.PrimitiveTypeKind == PrimitiveTypeKind.String)
+            {
+                Facet facet;
+                if (storeType.Facets.TryGetValue("MaxLength", false, out facet) && !facet.IsUnbounded &&
+                    facet.Value != null)
+                    return TypeUsage.CreateStringTypeUsage(edmPrimitiveType, false, false, (int)facet.Value);
+                else
+                    return TypeUsage.CreateStringTypeUsage(edmPrimitiveType, false, false);
+            }
+
+            return TypeUsage.CreateDefaultTypeUsage(edmPrimitiveType);
+        }
+
+        private const int CHAR_MAXLEN = 255;
+        private const int VARCHAR_MAXLEN = 65535;
+        private const int MEDIUMTEXT_MAXLEN = 16777215;
+        private const int LONGTEXT_MAXLEN = 1073741823;
+
+        private const int BINARY_MAXLEN = 255;
+        private const int VARBINARY_MAXLEN = 65535;
+        private const int MEDIUMBLOB_MAXLEN = 16777215;
+        private const int LONGBLOB_MAXLEN = 2147483647;
+
+        internal const int DEFAULT_DECIMAL_PRECISION = 10;
+        internal const int DEFAULT_DECIMAL_SCALE = 2;
+
+        public override TypeUsage GetStoreType(TypeUsage edmType)
+        {
+            if (edmType == null)
+                throw new ArgumentNullException("edmType");
+
+            Debug.Assert(edmType.EdmType.BuiltInTypeKind == BuiltInTypeKind.PrimitiveType);
+
+            PrimitiveType primitiveType = edmType.EdmType as PrimitiveType;
+            if (primitiveType == null)
+                throw new ArgumentException(String.Format(Resources.TypeNotSupported, edmType));
+
+            ReadOnlyMetadataCollection<Facet> facets = edmType.Facets;
+
+            switch (primitiveType.PrimitiveTypeKind)
+            {
+                case PrimitiveTypeKind.Boolean:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["bool"]);
+
+                case PrimitiveTypeKind.Byte:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["utinyint"]);
+
+                case PrimitiveTypeKind.SByte:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["tinyint"]);
+
+                case PrimitiveTypeKind.Int16:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["smallint"]);
+
+                case PrimitiveTypeKind.Int32:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["int"]);
+
+                case PrimitiveTypeKind.Int64:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["bigint"]);
+
+                case PrimitiveTypeKind.Guid:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["guid"]);
+
+                case PrimitiveTypeKind.Double:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["double"]);
+
+                case PrimitiveTypeKind.Single:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["float"]);
+
+                case PrimitiveTypeKind.Decimal:
+                {
+                    byte precision = DEFAULT_DECIMAL_PRECISION;
+                    byte scale = DEFAULT_DECIMAL_SCALE;
+                    Facet facet;
+
+                    if (edmType.Facets.TryGetValue("Precision", false, out facet))
+                    {
+                        if (!facet.IsUnbounded && facet.Value != null)
+                            precision = (byte)facet.Value;
+                    }
+
+                    if (edmType.Facets.TryGetValue("Scale", false, out facet))
+                    {
+                        if (!facet.IsUnbounded && facet.Value != null)
+                            scale = (byte)facet.Value;
+                    }
+
+                    return TypeUsage.CreateDecimalTypeUsage(StoreTypeNameToStorePrimitiveType["decimal"], precision,
+                        scale);
+                }
+
+                case PrimitiveTypeKind.Binary:
+                {
+                    bool isFixedLength = null != facets["FixedLength"].Value && (bool)facets["FixedLength"].Value;
+                    Facet f = facets["MaxLength"];
+                    bool isMaxLength = f.IsUnbounded || null == f.Value || (int)f.Value > MEDIUMBLOB_MAXLEN;
+                    int maxLength = !isMaxLength ? (int)f.Value : LONGBLOB_MAXLEN;
+
+                    string typeName = String.Empty;
+
+                    // now this applies for both isFixedLength and !isFixedLength
+                    if (maxLength < CHAR_MAXLEN) typeName = "tinyblob";
+                    else if (maxLength < MEDIUMBLOB_MAXLEN) typeName = "blob";
+                    else if (maxLength < LONGTEXT_MAXLEN) typeName = "mediumblob";
+                    else typeName = "longblob";
+
+                    return TypeUsage.CreateBinaryTypeUsage(StoreTypeNameToStorePrimitiveType[typeName], isFixedLength,
+                        maxLength);
+                }
+
+                case PrimitiveTypeKind.String:
+                {
+                    string typeName = String.Empty;
+                    bool isUnicode = null != facets["Unicode"].Value && (bool)facets["Unicode"].Value;
+                    bool isFixedLength = null != facets["FixedLength"].Value && (bool)facets["FixedLength"].Value;
+                    int maxLenghtValue;
+
+                    Facet maxLengthFacet = facets["MaxLength"];
+                    if (isFixedLength)
+                    {
+                        typeName = isUnicode ? "nchar" : "char";
+                        if (maxLengthFacet.Value != null &&
+                            Int32.TryParse(maxLengthFacet.Value.ToString(), out maxLenghtValue) &&
+                            maxLenghtValue <= CHAR_MAXLEN)
+                            return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType[typeName],
+                                isUnicode, isFixedLength, (int)maxLengthFacet.Value);
+                        else if (maxLengthFacet.Value != null && maxLengthFacet.Value.ToString() == "Max")
+                            return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType[typeName],
+                                isUnicode, isFixedLength, CHAR_MAXLEN);
+                        else
+                            return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType[typeName],
+                                isUnicode, isFixedLength);
+                    }
+                    else
+                    {
+                        typeName = isUnicode ? "nvarchar" : "varchar";
+                        if (maxLengthFacet.Value != null &&
+                            Int32.TryParse(maxLengthFacet.Value.ToString(), out maxLenghtValue))
+                        {
+                            if (maxLenghtValue > VARCHAR_MAXLEN && maxLenghtValue <= MEDIUMTEXT_MAXLEN)
+                                typeName = "mediumtext";
+                            else if ((int)maxLengthFacet.Value > MEDIUMTEXT_MAXLEN) typeName = "longtext";
+                            return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType[typeName],
+                                isUnicode, isFixedLength, (int)maxLengthFacet.Value);
+                        }
+                        else if (maxLengthFacet.Value != null && (maxLengthFacet.Value.ToString() == "Max"))
+                            return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType["longtext"],
+                                isUnicode, isFixedLength);
+                        else
+                            return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType[typeName],
+                                isUnicode, isFixedLength);
+                    }
+                }
+
+                case PrimitiveTypeKind.DateTimeOffset:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["timestamp"]);
+                case PrimitiveTypeKind.DateTime:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["datetime"]);
+                case PrimitiveTypeKind.Time:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["time"]);
 #if NET_45_OR_GREATER
-        case PrimitiveTypeKind.Geometry:
-          return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["geometry"]);
+                case PrimitiveTypeKind.Geometry:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["geometry"]);
 #endif
-        default:
-          throw new NotSupportedException(String.Format(Resources.NoStoreTypeForEdmType, edmType, primitiveType.PrimitiveTypeKind));
-      }
+                default:
+                    throw new NotSupportedException(String.Format(Resources.NoStoreTypeForEdmType, edmType,
+                        primitiveType.PrimitiveTypeKind));
+            }
+        }
+
+        private static XmlReader GetXmlResource(string resourceName)
+        {
+            Assembly executingAssembly = Assembly.GetExecutingAssembly();
+            Stream stream = executingAssembly.GetManifestResourceStream(resourceName);
+            return XmlReader.Create(stream);
+        }
+
+        private static XmlReader GetMappingResource(string resourceBaseName)
+        {
+            string rez = GetResourceAsString(
+                String.Format("MySql.Data.Entity.Properties.{0}", resourceBaseName));
+
+            StringReader sr = new StringReader(rez);
+            return XmlReader.Create(sr);
+        }
+
+        private static string GetResourceAsString(string resourceName)
+        {
+            Assembly executingAssembly = Assembly.GetExecutingAssembly();
+            Stream s = executingAssembly.GetManifestResourceStream(resourceName);
+            StreamReader sr = new StreamReader(s);
+            string resourceAsString = sr.ReadToEnd();
+            sr.Close();
+            s.Close();
+            return resourceAsString;
+        }
+
+        public override bool SupportsEscapingLikeArgument(out char escapeCharacter)
+        {
+            escapeCharacter = '~';
+            return true;
+        }
     }
-
-    private static XmlReader GetXmlResource(string resourceName)
-    {
-      Assembly executingAssembly = Assembly.GetExecutingAssembly();
-      Stream stream = executingAssembly.GetManifestResourceStream(resourceName);
-      return XmlReader.Create(stream);
-    }
-
-    private static XmlReader GetMappingResource(string resourceBaseName)
-    {
-      string rez = GetResourceAsString(
-          String.Format("MySql.Data.Entity.Properties.{0}", resourceBaseName));
-
-      StringReader sr = new StringReader(rez);
-      return XmlReader.Create(sr);
-
-    }
-
-    private static string GetResourceAsString(string resourceName)
-    {
-      Assembly executingAssembly = Assembly.GetExecutingAssembly();
-      Stream s = executingAssembly.GetManifestResourceStream(resourceName);
-      StreamReader sr = new StreamReader(s);
-      string resourceAsString = sr.ReadToEnd();
-      sr.Close();
-      s.Close();
-      return resourceAsString;
-    }
-  }
 }
