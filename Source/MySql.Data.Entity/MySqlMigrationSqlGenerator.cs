@@ -215,8 +215,8 @@ namespace MySql.Data.Entity
       _tableName = op.Table;
 
       MigrationStatement stmt = new MigrationStatement();
-      stmt.Sql = string.Format("alter table `{0}` add column `{1}`;",
-        TrimSchemaPrefix(op.Table), op.Column.Name) + " " + Generate(op.Column);
+      stmt.Sql = string.Format("alter table `{0}` add column `{1}`",
+        TrimSchemaPrefix(op.Table), op.Column.Name) + " " + Generate(op.Column) + ";";
       return stmt;
     }
 
